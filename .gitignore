@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Backend secrets and generated files
+server/.env
+server/taskboard.db
+server/node_modules/
