@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -9,74 +10,158 @@ import Stack from "@mui/material/Stack";
 
 import Board from "./Board";
 
-function BoardList() {
-
+function BoardList({ user, onLogout }) {
     const [boards, setBoards] = useState([]);
-
     const [value, setValue] = useState("");
-
     const [editIndex, setEditIndex] = useState(null);
+    const [selectedBoard, setSelectedBoard] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const [selectedBoard, setSelectedBoard] = useState("");
+    const token = localStorage.getItem("token");
 
-    const handleCreateBoard = () => {
+    const fetchBoards = async () => {
+        try {
+            const response = await fetch(
+                "http://localhost:5000/api/boards",
+                {
+                    headers: {
+                        Authorization: "Bearer " + token
+                    }
+                }
+            );
 
-        if (value === "") {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Could not load boards");
+            }
+
+            setBoards(data);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchBoards();
+    }, []);
+
+    const handleCreateBoard = async () => {
+        if (!value.trim()) {
             alert("Please enter board name");
             return;
         }
 
-        setBoards([...boards, value]);
+        try {
+            const response = await fetch(
+                "http://localhost:5000/api/boards",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + token
+                    },
+                    body: JSON.stringify({
+                        name: value.trim()
+                    })
+                }
+            );
 
-        setValue("");
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Could not create board");
+            }
+
+            setValue("");
+            await fetchBoards();
+        } catch (error) {
+            alert(error.message);
+        }
     };
 
+    const handleDeleteBoard = async (board) => {
+        if (!window.confirm(`Delete "${board.name}"?`)) {
+            return;
+        }
 
-    const handleDeleteBoard = (index) => {
+        try {
+            const response = await fetch(
+                `http://localhost:5000/api/boards/${board.id}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: "Bearer " + token
+                    }
+                }
+            );
 
-        const newBoards = [...boards];
+            const data = await response.json();
 
-        newBoards.splice(index, 1);
+            if (!response.ok) {
+                throw new Error(data.error || "Could not delete board");
+            }
 
-        setBoards(newBoards);
+            await fetchBoards();
+        } catch (error) {
+            alert(error.message);
+        }
     };
-
 
     const handleEditBoard = (index) => {
-
         setEditIndex(index);
-
-        setValue(boards[index]);
+        setValue(boards[index].name);
     };
 
+    const handleUpdateBoard = async () => {
+        if (!value.trim()) {
+            alert("Please enter board name");
+            return;
+        }
 
-    const handleUpdateBoard = () => {
+        const board = boards[editIndex];
 
-        const newBoards = [...boards];
+        try {
+            const response = await fetch(
+                `http://localhost:5000/api/boards/${board.id}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + token
+                    },
+                    body: JSON.stringify({
+                        name: value.trim()
+                    })
+                }
+            );
 
-        newBoards[editIndex] = value;
+            const data = await response.json();
 
-        setBoards(newBoards);
+            if (!response.ok) {
+                throw new Error(data.error || "Could not rename board");
+            }
 
-        setEditIndex(null);
-
-        setValue("");
+            setEditIndex(null);
+            setValue("");
+            await fetchBoards();
+        } catch (error) {
+            alert(error.message);
+        }
     };
 
-
-    if (selectedBoard !== "") {
-
+    if (selectedBoard !== null) {
         return (
             <Board
                 board={selectedBoard}
-                onBack={() => setSelectedBoard("")}
+                onBack={() => setSelectedBoard(null)}
             />
         );
     }
 
-
     return (
-
         <Box
             sx={{
                 minHeight: "100vh",
@@ -84,15 +169,22 @@ function BoardList() {
                 padding: "40px 20px"
             }}
         >
+            <Box sx={{ maxWidth: "900px", margin: "0 auto" }}>
+                <Stack
+                    direction="row"
+                    justifyContent="flex-end"
+                    alignItems="center"
+                    spacing={2}
+                    sx={{ marginBottom: "20px" }}
+                >
+                    <Typography sx={{ color: "#666" }}>
+                        {user?.name || user?.email || ""}
+                    </Typography>
 
-            <Box
-                sx={{
-                    maxWidth: "900px",
-                    margin: "0 auto"
-                }}
-            >
-
-                {/* Page Heading */}
+                    <Button variant="outlined" onClick={onLogout}>
+                        Logout
+                    </Button>
+                </Stack>
 
                 <Typography
                     variant="h3"
@@ -105,7 +197,6 @@ function BoardList() {
                     My Boards
                 </Typography>
 
-
                 <Typography
                     sx={{
                         textAlign: "center",
@@ -116,44 +207,24 @@ function BoardList() {
                     Create and manage your task boards
                 </Typography>
 
-
-                {/* Create Board */}
-
-                <Paper
-                    sx={{
-                        padding: "25px",
-                        marginBottom: "30px"
-                    }}
-                >
-
+                <Paper sx={{ padding: "25px", marginBottom: "30px" }}>
                     <Typography
                         variant="h5"
-                        sx={{
-                            fontWeight: "bold",
-                            marginBottom: "20px"
-                        }}
+                        sx={{ fontWeight: "bold", marginBottom: "20px" }}
                     >
-                        Create New Board
+                        {editIndex === null ? "Create New Board" : "Rename Board"}
                     </Typography>
 
-
                     <Stack
-                        direction={{
-                            xs: "column",
-                            sm: "row"
-                        }}
+                        direction={{ xs: "column", sm: "row" }}
                         spacing={2}
                     >
-
                         <TextField
                             fullWidth
                             label="Board Name"
                             value={value}
-                            onChange={(e) =>
-                                setValue(e.target.value)
-                            }
+                            onChange={(e) => setValue(e.target.value)}
                         />
-
 
                         <Button
                             variant="contained"
@@ -162,139 +233,101 @@ function BoardList() {
                                     ? handleCreateBoard
                                     : handleUpdateBoard
                             }
-                            sx={{
-                                minWidth: "150px"
-                            }}
+                            sx={{ minWidth: "150px" }}
                         >
-
-                            {editIndex === null
-                                ? "Create Board"
-                                : "Update Board"}
-
+                            {editIndex === null ? "Create Board" : "Update Board"}
                         </Button>
 
+                        {editIndex !== null && (
+                            <Button
+                                variant="text"
+                                onClick={() => {
+                                    setEditIndex(null);
+                                    setValue("");
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        )}
                     </Stack>
-
                 </Paper>
-
-
-                {/* Board List */}
 
                 <Typography
                     variant="h5"
-                    sx={{
-                        fontWeight: "bold",
-                        marginBottom: "15px"
-                    }}
+                    sx={{ fontWeight: "bold", marginBottom: "15px" }}
                 >
                     Your Boards
                 </Typography>
 
-
-                {boards.length === 0 ? (
-
-                    <Paper
-                        sx={{
-                            padding: "40px",
-                            textAlign: "center"
-                        }}
-                    >
-
-                        <Typography
-                            sx={{
-                                color: "#888"
-                            }}
-                        >
+                {loading ? (
+                    <Paper sx={{ padding: "40px", textAlign: "center" }}>
+                        <Typography>Loading boards...</Typography>
+                    </Paper>
+                ) : boards.length === 0 ? (
+                    <Paper sx={{ padding: "40px", textAlign: "center" }}>
+                        <Typography sx={{ color: "#888" }}>
                             No boards created yet.
                         </Typography>
-
                     </Paper>
-
                 ) : (
-
                     <Stack spacing={2}>
-
                         {boards.map((board, index) => (
-
-                            <Paper
-                                key={index}
-                                sx={{
-                                    padding: "20px"
-                                }}
-                            >
-
+                            <Paper key={board.id} sx={{ padding: "20px" }}>
                                 <Stack
-                                    direction={{
-                                        xs: "column",
-                                        sm: "row"
-                                    }}
+                                    direction={{ xs: "column", sm: "row" }}
                                     spacing={2}
-                                    alignItems={{
-                                        xs: "stretch",
-                                        sm: "center"
-                                    }}
+                                    alignItems={{ xs: "stretch", sm: "center" }}
                                     justifyContent="space-between"
                                 >
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            {board.name}
+                                        </Typography>
 
-                                    <Typography
-                                        variant="h6"
-                                        sx={{
-                                            fontWeight: "bold"
-                                        }}
-                                    >
-                                        {board}
-                                    </Typography>
+                                        {board.description && (
+                                            <Typography
+                                                sx={{ color: "#777", marginTop: "4px" }}
+                                            >
+                                                {board.description}
+                                            </Typography>
+                                        )}
+                                    </Box>
 
-
-                                    <Stack
-                                        direction="row"
-                                        spacing={1}
-                                    >
-
+                                    <Stack direction="row" spacing={1}>
                                         <Button
                                             variant="contained"
-                                            onClick={() =>
-                                                setSelectedBoard(board)
-                                            }
+                                            onClick={() => setSelectedBoard(board)}
                                         >
                                             Open
                                         </Button>
 
-
                                         <Button
                                             variant="outlined"
-                                            onClick={() =>
-                                                handleEditBoard(index)
-                                            }
+                                            onClick={() => {
+                                                console.log("Rename clicked:", board);
+                                                handleEditBoard(index);
+                                            }}
                                         >
                                             Rename
                                         </Button>
 
-
                                         <Button
                                             variant="outlined"
                                             color="error"
-                                            onClick={() =>
-                                                handleDeleteBoard(index)
-                                            }
+                                            onClick={() => handleDeleteBoard(board)}
                                         >
                                             Delete
                                         </Button>
-
                                     </Stack>
-
                                 </Stack>
-
                             </Paper>
-
                         ))}
-
                     </Stack>
-
                 )}
-
             </Box>
-
         </Box>
     );
 }

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 
 import Button from "@mui/material/Button";
@@ -7,30 +8,56 @@ import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 
-function Login({ user, onLogin, onRegister }) {
-
+function Login({ onLogin, onRegister }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = () => {
-
-        if (email === "" || password === "") {
+    const handleLogin = async () => {
+        if (!email.trim() || !password) {
             alert("Please enter email and password");
             return;
         }
 
-        if (
-            email === user.email &&
-            password === user.password
-        ) {
-            onLogin();
-        } else {
-            alert("Incorrect email or password");
+        try {
+            setLoading(true);
+
+            const response = await fetch(
+                "http://localhost:5000/api/auth/login",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        email: email.trim(),
+                        password
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.error || "Login failed");
+                return;
+            }
+
+            localStorage.setItem("token", data.token);
+            localStorage.setItem(
+                "user",
+                JSON.stringify(data.user)
+            );
+
+            onLogin(data.user);
+        } catch (error) {
+            alert("Cannot connect to the server. Check that your backend is running.");
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-
         <Box
             sx={{
                 minHeight: "100vh",
@@ -41,7 +68,6 @@ function Login({ user, onLogin, onRegister }) {
                 padding: "20px"
             }}
         >
-
             <Paper
                 sx={{
                     padding: "35px",
@@ -49,7 +75,6 @@ function Login({ user, onLogin, onRegister }) {
                     maxWidth: "450px"
                 }}
             >
-
                 <Typography
                     variant="h4"
                     sx={{
@@ -71,17 +96,13 @@ function Login({ user, onLogin, onRegister }) {
                     Login to your Task Management System
                 </Typography>
 
-
                 <Stack spacing={2}>
-
                     <TextField
                         fullWidth
                         label="Email"
                         type="email"
                         value={email}
-                        onChange={(e) =>
-                            setEmail(e.target.value)
-                        }
+                        onChange={(e) => setEmail(e.target.value)}
                     />
 
                     <TextField
@@ -89,17 +110,16 @@ function Login({ user, onLogin, onRegister }) {
                         label="Password"
                         type="password"
                         value={password}
-                        onChange={(e) =>
-                            setPassword(e.target.value)
-                        }
+                        onChange={(e) => setPassword(e.target.value)}
                     />
 
                     <Button
                         variant="contained"
                         size="large"
                         onClick={handleLogin}
+                        disabled={loading}
                     >
-                        Login
+                        {loading ? "Logging in..." : "Login"}
                     </Button>
 
                     <Button
@@ -108,11 +128,8 @@ function Login({ user, onLogin, onRegister }) {
                     >
                         Don't have an account? Register
                     </Button>
-
                 </Stack>
-
             </Paper>
-
         </Box>
     );
 }

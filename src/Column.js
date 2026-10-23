@@ -7,13 +7,14 @@ import Task from "./Task";
 
 function Column({
     column,
+    columnId,
     tasks,
     onEditTask,
     onDeleteTask
 }) {
 
     const columnTasks = tasks.filter(
-        (task) => task.column === column
+        (task) => task.column_id === columnId
     );
 
     return (
@@ -54,10 +55,10 @@ function Column({
                             key={index}
                             task={task}
                             onEdit={(updatedTask) =>
-                                onEditTask(index, updatedTask)
+                                onEditTask(task.id, updatedTask)
                             }
                             onDelete={() =>
-                                onDeleteTask(index)
+                                onDeleteTask(task.id)
                             }
                         />
 

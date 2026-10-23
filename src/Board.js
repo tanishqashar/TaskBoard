@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -15,36 +15,87 @@ import Column from "./Column";
 
 function Board({ board, onBack }) {
 
-    const columns = ["To Do", "In Progress", "Done"];
-
     const [tasks, setTasks] = useState([]);
-
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDescription, setTaskDescription] = useState("");
     const [priority, setPriority] = useState("Medium");
     const [dueDate, setDueDate] = useState("");
     const [assignee, setAssignee] = useState("");
     const [taskColumn, setTaskColumn] = useState("To Do");
-
     const [search, setSearch] = useState("");
+    const [columns, setColumns] = useState([]);
 
-    const handleAddTask = () => {
 
-        if (taskTitle === "") {
-            alert("Please enter task title");
-            return;
+    
+    
+    const fetchBoardData = async () => {
+        try {
+            const token = localStorage.getItem("token");
+
+            const response = await fetch(
+                `http://localhost:5000/api/boards/${board.id}`,
+                {
+                    headers: {
+                        Authorization: "Bearer " + token
+                    }
+                }
+            ); 
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Could not load board");
+            }
+
+            setColumns(data.columns);
+            setTasks(data.tasks);
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    useEffect(() => {
+        fetchBoardData();
+    }, [board.id]);
+
+    
+const handleAddTask = async () => {
+    if (taskTitle.trim() === "") {
+        alert("Please enter task title");
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem("token");
+
+        const response = await fetch(
+            `http://localhost:5000/api/boards/${board.id}/tasks`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + token
+                },
+                body: JSON.stringify({
+                    title: taskTitle.trim(),
+                    description: taskDescription,
+                    priority: priority,
+                    due_date: dueDate || null,
+                    assignee_id: assignee ? Number(assignee) : null,
+                    column_id: columns.find(
+                        (column) => column.name === taskColumn
+                    )?.id
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Could not save task");
         }
 
-        const newTask = {
-            title: taskTitle,
-            description: taskDescription,
-            priority: priority,
-            dueDate: dueDate,
-            assignee: assignee,
-            column: taskColumn
-        };
-
-        setTasks([...tasks, newTask]);
+        await fetchBoardData();
 
         setTaskTitle("");
         setTaskDescription("");
@@ -52,28 +103,70 @@ function Board({ board, onBack }) {
         setDueDate("");
         setAssignee("");
         setTaskColumn("To Do");
-    };
+    } catch (error) {
+        alert(error.message);
+    }
+};
 
-    const handleEditTask = (index, updatedTask) => {
+    
+const handleEditTask = async (taskId, updatedTask) => {
+    try {
+        const token = localStorage.getItem("token");
 
-        const newTasks = [...tasks];
+        const response = await fetch(
+            `http://localhost:5000/api/boards/${board.id}/tasks/${taskId}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + token
+                },
+                body: JSON.stringify(updatedTask)
+            }
+        );
 
-        newTasks[index] = updatedTask;
+        const data = await response.json();
 
-        setTasks(newTasks);
-    };
+        if (!response.ok) {
+            throw new Error(data.error || "Could not update task");
+        }
 
-    const handleDeleteTask = (index) => {
+        await fetchBoardData();
+    } catch (error) {
+        alert(error.message);
+    }
+};
 
-        const newTasks = [...tasks];
+ 
+const handleDeleteTask = async (taskId) => {
+    try {
+        const token = localStorage.getItem("token");
 
-        newTasks.splice(index, 1);
+        const response = await fetch(
+            `http://localhost:5000/api/boards/${board.id}/tasks/${taskId}`,
+            {
+                method: "DELETE",
+                headers: {
+                    Authorization: "Bearer " + token
+                }
+            }
+        );
 
-        setTasks(newTasks);
-    };
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Could not delete task");
+        }
+
+        await fetchBoardData();
+    } catch (error) {
+        alert(error.message);
+    }
+};
+
 
     const filteredTasks = tasks.filter((task) =>
-        task.title.toLowerCase().includes(search.toLowerCase())
+    task.title.toLowerCase().includes(search.toLowerCase())
     );
 
     return (
@@ -113,7 +206,7 @@ function Board({ board, onBack }) {
                         marginBottom: "20px"
                     }}
                 >
-                    {board}
+                    {board.name}
                 </Typography>
 
 
@@ -339,7 +432,7 @@ function Board({ board, onBack }) {
                     {columns.map((column) => (
 
                         <Paper
-                            key={column}
+                            key={column.id}
                             sx={{
                                 padding: "20px",
                                 flex: 1,
@@ -348,7 +441,8 @@ function Board({ board, onBack }) {
                         >
 
                             <Column
-                                column={column}
+                                column={column.name}
+                                columnId={column.id}
                                 tasks={filteredTasks}
                                 onEditTask={handleEditTask}
                                 onDeleteTask={handleDeleteTask}
